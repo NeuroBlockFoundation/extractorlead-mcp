@@ -160,8 +160,9 @@ def http_server(monkeypatch):
     # Una key en el entorno del servidor compartido NO debe usarse nunca.
     monkeypatch.setenv("EXTRACTORLEAD_API_KEY", "sk_live_SERVER_ENV")
     port = _free_port()
-    app = server.mcp.streamable_http_app(stateless_http=True, json_response=True,
-                                         host="0.0.0.0")
+    from extractorlead_mcp.guide import BrowserGuide
+    app = BrowserGuide(server.mcp.streamable_http_app(stateless_http=True,
+                                                      json_response=True, host="0.0.0.0"))
     srv = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
     t = threading.Thread(target=srv.run, daemon=True)
     t.start()
@@ -216,3 +217,23 @@ def test_hashed_provider_field_is_stripped():
     from extractorlead_mcp.client import strip_provider_fields
     hidden = bytes.fromhex("61706f6c6c6f5f6964").decode()
     assert strip_provider_fields({hidden: 1, "email": "a@b.c"}) == {"email": "a@b.c"}
+
+
+def test_browser_gets_the_guide_in_its_language(http_server):
+    import httpx2
+    r = httpx2.get(f"{http_server}/mcp", headers={
+        "Accept": "text/html,application/xhtml+xml", "Accept-Language": "en-GB,en;q=0.9"})
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
+    assert "Connect ExtractorLead to Claude" in r.text
+    assert "https://api.extractorlead.com/mcp" in r.text
+    r = httpx2.get(f"{http_server}/mcp", headers={"Accept": "text/html", "Accept-Language": "fr"})
+    assert "Conecta ExtractorLead con Claude" in r.text
+
+
+def test_mcp_clients_are_not_affected_by_the_guide(http_server):
+    import httpx2
+    # Un GET de cliente MCP (SSE) sigue yendo al servidor MCP, no a la guia.
+    # Un GET SSE abre un stream que no se cierra solo: basta con las cabeceras.
+    with httpx2.stream("GET", f"{http_server}/mcp", headers={"Accept": "text/event-stream"},
+                       timeout=5) as r:
+        assert "text/html" not in r.headers.get("content-type", "")

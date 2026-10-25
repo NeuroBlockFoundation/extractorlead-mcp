@@ -19,8 +19,11 @@ def main() -> None:
         import uvicorn
         # Sin estado: cualquier réplica atiende cualquier petición, así que se
         # puede escalar detrás del balanceador sin sesiones pegajosas.
+        from .guide import BrowserGuide
         app = server.mcp.streamable_http_app(stateless_http=True, json_response=True,
                                              host=args.host)
+        # Quien abre la URL del conector en un navegador ve cómo añadirlo a Claude.
+        app = BrowserGuide(app)
         # access_log=False: la URL del conector de claude.ai lleva la API key en
         # ?api_key=, y el log de accesos la escribiría en claro en cada petición.
         uvicorn.run(app, host=args.host, port=args.port, access_log=False,
