@@ -1,0 +1,12 @@
+{
+  "name": "extractorlead",
+  "description": "ExtractorLead plugins for Claude Code",
+  "owner": { "name": "NeuroBlock Foundation", "url": "https://extractorlead.com" },
+  "plugins": [
+    {
+      "name": "extractorlead",
+      "source": "./",
+      "description": "ExtractorLead MCP connector + prospecting skill"
+    }
+  ]
+}

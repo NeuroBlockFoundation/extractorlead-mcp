@@ -1,0 +1,85 @@
+# Referencia de despliegue del MCP remoto en el cluster de extractor-lead.
+# Producción se gestiona desde neuroblock-infra (Terraform): llevar allí estos
+# recursos en vez de aplicarlos a mano.
+#
+# Publica https://api.extractorlead.com/mcp en el MISMO ALB compartido
+# (group neuroblock-shared) con un group.order menor que el del API (1), así
+# la regla /mcp se evalúa antes que el catch-all "/" del API. Sin DNS ni
+# certificado nuevos.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: extractorlead-mcp
+  namespace: extractor-lead
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
+  selector:
+    matchLabels: {app: extractorlead-mcp}
+  template:
+    metadata:
+      labels: {app: extractorlead-mcp}
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: arm64
+      containers:
+      - name: extractorlead-mcp
+        image: ${ECR_REGISTRY}/influaria/extractorlead-mcp:${IMAGE_TAG}
+        ports: [{containerPort: 8080}]
+        env:
+        # Dentro del cluster se habla con el API por el Service: sin pasar por
+        # el ALB/WAF ni pagar el viaje de ida y vuelta a internet.
+        - name: EXTRACTORLEAD_API_URL
+          value: http://extractor-lead-svc.extractor-lead.svc.cluster.local:5000
+        resources:
+          requests: {cpu: 50m, memory: 96Mi}
+          limits: {cpu: 300m, memory: 256Mi}
+        readinessProbe:
+          httpGet: {path: /health, port: 8080}
+          periodSeconds: 10
+        livenessProbe:
+          httpGet: {path: /health, port: 8080}
+          periodSeconds: 30
+        securityContext:
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: extractorlead-mcp-svc
+  namespace: extractor-lead
+spec:
+  type: ClusterIP
+  selector: {app: extractorlead-mcp}
+  ports: [{port: 8080, targetPort: 8080}]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: extractorlead-mcp-ingress
+  namespace: extractor-lead
+  annotations:
+    alb.ingress.kubernetes.io/group.name: neuroblock-shared
+    alb.ingress.kubernetes.io/group.order: "0"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: ${CERTIFICATE_ARN}
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+spec:
+  ingressClassName: alb
+  rules:
+  - host: api.extractorlead.com
+    http:
+      paths:
+      - path: /mcp
+        pathType: Prefix
+        backend:
+          service:
+            name: extractorlead-mcp-svc
+            port: {number: 8080}
