@@ -31,7 +31,9 @@ If your client can't set headers, you can use the URL
 `https://api.extractorlead.com/mcp?api_key=sk_live_...` instead. That URL is a
 secret: anyone who has it can spend your credits. Revoke the key if it leaks.
 
-**Skill (recommended):** download `extractorlead-skill.zip` and upload it at
+**Skill (recommended):** download
+[`extractorlead-skill.zip`](https://github.com/NeuroBlockFoundation/extractorlead-mcp/releases/latest/download/extractorlead-skill.zip)
+and upload it at
 **Customize → Skills → + → Upload a skill**.
 
 ### Claude Code (plugin: connector + skill in one step)
