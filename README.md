@@ -117,5 +117,6 @@ reads its own disk: every request must bring the user's key (`X-API-Key`,
 `Authorization: Bearer`, or `?api_key=`), and the access log is disabled so
 keys in the URL aren't written to logs.
 
-Deployment: `Dockerfile` + reference manifests in `deploy/k8s.yaml` (publishes
-`/mcp` on the shared ALB in front of the API).
+Deployment: the remote server runs on ExtractorLead's infrastructure (image from
+`Dockerfile`, Terraform stack `extractor-lead/mcp`). This public repository is a
+mirror synced automatically on every release.
