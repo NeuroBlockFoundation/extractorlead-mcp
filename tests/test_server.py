@@ -160,9 +160,11 @@ def http_server(monkeypatch):
     # Una key en el entorno del servidor compartido NO debe usarse nunca.
     monkeypatch.setenv("EXTRACTORLEAD_API_KEY", "sk_live_SERVER_ENV")
     port = _free_port()
+    from extractorlead_mcp.auth_gate import AuthGate
     from extractorlead_mcp.guide import BrowserGuide
-    app = BrowserGuide(server.mcp.streamable_http_app(stateless_http=True,
-                                                      json_response=True, host="0.0.0.0"))
+    # Igual que __main__: la guía para navegadores y la puerta de autenticación.
+    app = BrowserGuide(AuthGate(server.mcp.streamable_http_app(
+        stateless_http=True, json_response=True, host="0.0.0.0")))
     srv = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
     t = threading.Thread(target=srv.run, daemon=True)
     t.start()
@@ -202,9 +204,14 @@ async def test_http_mode_uses_per_request_key(http_server, how):
 
 @respx.mock
 async def test_http_mode_without_key_never_falls_back_to_env(http_server):
+    import httpx2
     route = respx.get(f"{API}/account").mock(return_value=httpx.Response(200, json={}))
-    res = await _http_call(f"{http_server}/mcp")
-    assert res.is_error and "API_KEY_MISSING" in res.content[0].text
+    # Sin credencial: 401 con los metadatos OAuth (Claude ofrece "Conectar"),
+    # nunca la key del entorno del servidor.
+    r = httpx2.post(f"{http_server}/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "ping"},
+                    headers={"Accept": "application/json, text/event-stream"})
+    assert r.status_code == 401
+    assert "resource_metadata=" in r.headers["www-authenticate"]
     assert not route.called
 
 

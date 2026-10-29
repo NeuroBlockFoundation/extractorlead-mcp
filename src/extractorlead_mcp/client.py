@@ -57,8 +57,9 @@ class ExtractorLeadError(Exception):
 
 
 _HINTS = {
-    401: (f"La API key no es válida o falta. Crea una en {APP_URL} (Perfil → API keys) "
-          "y configúrala en el conector."),
+    401: ("La conexión con ExtractorLead no es válida o ha caducado. En Claude, abre "
+          "Personalizar → Conectores → ExtractorLead y pulsa Conectar para iniciar "
+          f"sesión de nuevo (o usa una API key de {APP_URL}, Perfil → API keys)."),
     402: f"Saldo insuficiente. Se pueden recargar créditos en {APP_URL}/profile.",
     404: "La tarea no existe o pertenece a otra cuenta.",
     429: "Demasiadas peticiones; espera unos segundos y reintenta.",
@@ -76,10 +77,12 @@ class ExtractorLeadClient:
                  timeout: float = 55.0):
         if not api_key:
             raise ExtractorLeadError("API_KEY_MISSING", _HINTS[401], 401)
-        if not api_key.startswith("sk_live_"):
+        # sk_live_: API key del usuario. elo_at_: access token OAuth del
+        # conector (lo emite api.extractorlead.com al pulsar Conectar en Claude).
+        if not api_key.startswith(("sk_live_", "elo_at_")):
             raise ExtractorLeadError(
                 "API_KEY_INVALID",
-                "La API key debe empezar por 'sk_live_'. " + _HINTS[401], 401)
+                "La credencial debe ser una API key (sk_live_...). " + _HINTS[401], 401)
         self._http = httpx.AsyncClient(
             base_url=(url or base_url()) + "/api/v1",
             headers={"X-API-Key": api_key,

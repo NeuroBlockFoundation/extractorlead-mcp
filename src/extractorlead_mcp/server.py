@@ -6,7 +6,10 @@ Expone la API pública v1 como herramientas para Claude. Dos modos:
          de entorno EXTRACTORLEAD_API_KEY y el servidor puede leer ficheros
          CSV/XLSX del disco del usuario.
   http   Conector remoto (claude.ai, Claude Desktop, Claude Code). Cada petición
-         trae SU key (cabecera X-API-Key, Authorization: Bearer o ?api_key=).
+         trae SU credencial: el access token OAuth que Claude obtiene al pulsar
+         Conectar (Authorization: Bearer elo_at_...) o una API key (cabecera
+         X-API-Key, Authorization: Bearer o ?api_key=). auth_gate.AuthGate
+         responde 401 con los metadatos OAuth si no trae ninguna.
          Nunca se usa una key del entorno ni se lee el disco del servidor: el
          servidor es compartido y cada usuario paga con su propia cuenta.
 """
@@ -51,7 +54,7 @@ mcp = MCPServer(
     description="Lead generation and contact enrichment (emails & phones).",
     instructions=INSTRUCTIONS,
     website_url="https://extractorlead.com",
-    version="0.1.0",
+    version="0.2.0",
 )
 
 # "stdio" o "http"; lo fija __main__ antes de arrancar.

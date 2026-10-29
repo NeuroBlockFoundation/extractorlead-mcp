@@ -102,9 +102,11 @@ su propio Excel con columnas nuevas, con un tope de gasto (`credit_cap`).
 
 ## Errores frecuentes
 
-- `API_KEY_MISSING` / `API_KEY_INVALID`: el conector no tiene una key válida.
-  Se crea en https://app.extractorlead.com (Perfil → API keys) y empieza por
-  `sk_live_`.
+- `API_KEY_MISSING` / `API_KEY_INVALID` / `TOKEN_INVALID`: el conector no
+  está conectado o la conexión caducó. Pide al usuario que abra Personalizar →
+  Conectores → ExtractorLead y pulse Conectar para iniciar sesión de nuevo. Con
+  el servidor local se usa una API key de https://app.extractorlead.com (Perfil
+  → API keys), que empieza por `sk_live_`.
 - `INSUFFICIENT_BALANCE` (402): faltan créditos; recarga en
   https://app.extractorlead.com/profile. Propón reducir `lead_count` o filas.
 - `TEMPORARILY_UNAVAILABLE` (503): reintenta en unos segundos; el trabajo no

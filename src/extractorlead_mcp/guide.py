@@ -26,20 +26,22 @@ _TEXTS = {
         "url": "URL del conector",
         "copy": "Copiar",
         "copied": "Copiado",
-        "s1": "Crea tu API key",
-        "s1d": ("En <a href=\"{app}/profile\">app.extractorlead.com</a> → Perfil → API keys. "
-                "Empieza por <code>sk_live_</code>. Guárdala: solo se muestra una vez."),
-        "s2": "Añade el conector en claude.ai o Claude Desktop",
-        "s2d": ("<b>Personalizar → Conectores → Añadir → Añadir conector personalizado</b>. "
-                "Pega la URL de arriba, en Autenticación elige <b>Sin inicio de sesión</b> y "
-                "en <b>Cabeceras de la petición</b> añade <code>X-API-Key</code> con tu key. "
-                "En Team/Enterprise lo añade un Owner desde Configuración de la organización."),
+        "s1": "Añade el conector en claude.ai o Claude Desktop",
+        "s1d": ("<b>Personalizar → Conectores → Añadir conector personalizado</b>. Ponle de "
+                "nombre <b>ExtractorLead</b>, pega la URL de arriba y pulsa <b>Añadir</b>. "
+                "No hace falta rellenar nada más. En Team/Enterprise lo añade un Owner desde "
+                "Configuración de la organización → Conectores."),
+        "s2": "Conecta tu cuenta",
+        "s2d": ("Pulsa <b>Conectar</b>: se abre ExtractorLead, inicias sesión (o creas tu "
+                "cuenta gratis) y pulsas <b>Permitir</b>. Sin copiar claves. Puedes "
+                "desconectarlo cuando quieras desde <a href=\"{app}/profile\">Perfil → API y "
+                "Claude</a>."),
         "s3": "Sube la skill (recomendado)",
         "s3d": ("Descarga <a href=\"{skill}\">extractorlead-skill.zip</a> y súbela en "
                 "<b>Personalizar → Skills → + → Subir una skill</b>. Enseña a Claude a "
                 "cotizar antes de gastar y a seguir los trabajos largos."),
         "s4": "¿Usas Claude Code?",
-        "s4d": "Un comando y listo:",
+        "s4d": "Añádelo con un comando y, dentro de Claude Code, escribe /mcp → Authenticate:",
         "s4p": "O el plugin, que trae el conector y la skill juntos:",
         "try": "Pruébalo",
         "ex": ["¿Cuántos créditos me quedan en ExtractorLead?",
@@ -57,20 +59,21 @@ _TEXTS = {
         "url": "Connector URL",
         "copy": "Copy",
         "copied": "Copied",
-        "s1": "Create your API key",
-        "s1d": ("At <a href=\"{app}/profile\">app.extractorlead.com</a> → Profile → API keys. "
-                "It starts with <code>sk_live_</code>. Save it: it's shown only once."),
-        "s2": "Add the connector in claude.ai or Claude Desktop",
-        "s2d": ("<b>Customize → Connectors → Add → Add custom connector</b>. Paste the URL "
-                "above, set Authentication to <b>No sign in</b> and under <b>Request "
-                "headers</b> add <code>X-API-Key</code> with your key. On Team/Enterprise "
-                "an Owner adds it from Organization settings."),
+        "s1": "Add the connector in claude.ai or Claude Desktop",
+        "s1d": ("<b>Customize → Connectors → Add custom connector</b>. Name it "
+                "<b>ExtractorLead</b>, paste the URL above and click <b>Add</b>. Nothing "
+                "else to fill in. On Team/Enterprise an Owner adds it from Organization "
+                "settings → Connectors."),
+        "s2": "Connect your account",
+        "s2d": ("Click <b>Connect</b>: ExtractorLead opens, you sign in (or create a free "
+                "account) and click <b>Allow</b>. No keys to copy. You can disconnect it "
+                "any time from <a href=\"{app}/profile\">Profile → API & Claude</a>."),
         "s3": "Upload the skill (recommended)",
         "s3d": ("Download <a href=\"{skill}\">extractorlead-skill.zip</a> and upload it at "
                 "<b>Customize → Skills → + → Upload a skill</b>. It teaches Claude to quote "
                 "before spending and to follow long-running jobs."),
         "s4": "Using Claude Code?",
-        "s4d": "One command:",
+        "s4d": "Add it with one command, then run /mcp → Authenticate inside Claude Code:",
         "s4p": "Or the plugin, which bundles the connector and the skill:",
         "try": "Try it",
         "ex": ["How many ExtractorLead credits do I have left?",
@@ -82,8 +85,7 @@ _TEXTS = {
     },
 }
 
-_CLI = (f'claude mcp add --transport http extractorlead {MCP_URL} '
-        f'--header "X-API-Key: sk_live_..."')
+_CLI = f'claude mcp add --transport http extractorlead {MCP_URL}'
 _PLUGIN = ("/plugin marketplace add NeuroBlockFoundation/extractorlead-mcp\n"
            "/plugin install extractorlead@extractorlead")
 
@@ -119,12 +121,12 @@ def render(lang: str) -> str:
 <style>
 :root {{
   --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; --muted: #6e6e73;
-  --line: rgba(0,0,0,.08); --primary: #007AFF; --primary-soft: #e8f2ff; --code: rgba(0,0,0,.05);
+  --line: rgba(0,0,0,.08); --primary: #6C4CF5; --primary-soft: #F1EDFF; --code: rgba(0,0,0,.05);
 }}
 @media (prefers-color-scheme: dark) {{
   :root {{
     --bg: #000000; --card: #1c1c1e; --text: #f5f5f7; --muted: #98989d;
-    --line: rgba(255,255,255,.1); --primary: #0A84FF; --primary-soft: rgba(10,132,255,.15);
+    --line: rgba(255,255,255,.1); --primary: #8B73FF; --primary-soft: rgba(139,115,255,.16);
     --code: rgba(255,255,255,.07);
   }}
 }}
@@ -183,7 +185,7 @@ footer {{ font-size: 13px; color: var(--muted); text-align: center; margin-top: 
   <div class="card">
     <ol>
       <li><h2>{t["s1"]}</h2><p>{t["s1d"].format(**fmt)}</p></li>
-      <li><h2>{t["s2"]}</h2><p>{t["s2d"]}</p></li>
+      <li><h2>{t["s2"]}</h2><p>{t["s2d"].format(**fmt)}</p></li>
       <li><h2>{t["s3"]}</h2><p>{t["s3d"].format(**fmt)}</p></li>
       <li><h2>{t["s4"]}</h2><p>{t["s4d"]}</p>{copy_block(_CLI)}
         <p style="margin-top:12px">{t["s4p"]}</p>{copy_block(_PLUGIN, multiline=True)}</li>

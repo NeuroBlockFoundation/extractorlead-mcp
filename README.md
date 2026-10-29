@@ -3,7 +3,8 @@
 Find B2B/B2C leads (emails and phone numbers) on LinkedIn, Instagram, TikTok and
 websites, and enrich your own contact lists, directly from Claude.
 
-- **MCP server** — 13 tools that call the ExtractorLead API with *your* API key.
+- **MCP server** — 13 tools that call the ExtractorLead API with *your* account
+  (sign in with OAuth, or use an API key).
 - **Skill** — teaches Claude the workflow: check balance, quote, ask before
   spending credits, poll async jobs, deliver results.
 
@@ -11,25 +12,20 @@ Every action is billed to your ExtractorLead account, exactly as through the
 API. Claude always asks for confirmation before launching anything that costs
 credits.
 
-## 1. Get an API key
-
-Sign in at <https://app.extractorlead.com> → **Profile → API keys** → create a
-key. It starts with `sk_live_`. Treat it like a password.
-
-## 2. Add it to Claude
+## 1. Add it to Claude
 
 ### claude.ai and Claude Desktop (custom connector)
 
-1. **Customize → Connectors → + Add → Add custom connector**
+1. **Customize → Connectors → Add custom connector**
    (Team/Enterprise: an Owner adds it under *Organization settings → Connectors*).
-2. Name: `ExtractorLead` · URL: `https://api.extractorlead.com/mcp`
-3. Authentication: **No sign in**. Under **Request headers** add
-   `X-API-Key` = `sk_live_...`
-4. Add, then enable it in a chat from the tools menu.
+2. Name: `ExtractorLead` · URL: `https://api.extractorlead.com/mcp` → **Add**.
+   Leave the advanced settings empty.
+3. Click **Connect**, sign in to ExtractorLead (or create a free account) and
+   click **Allow**. No API key needed.
+4. Enable it in a chat from the **+ → Connectors** menu.
 
-If your client can't set headers, you can use the URL
-`https://api.extractorlead.com/mcp?api_key=sk_live_...` instead. That URL is a
-secret: anyone who has it can spend your credits. Revoke the key if it leaks.
+Disconnect it any time from <https://app.extractorlead.com/profile> → **API &
+Claude**.
 
 **Skill (recommended):** download
 [`extractorlead-skill.zip`](https://github.com/NeuroBlockFoundation/extractorlead-mcp/releases/latest/download/extractorlead-skill.zip)
@@ -43,18 +39,23 @@ and upload it at
 /plugin install extractorlead@extractorlead
 ```
 
-Claude Code prompts for the API key and stores it in the system keychain.
+Then run `/mcp`, pick **extractorlead** → **Authenticate** and sign in to
+ExtractorLead in the browser.
 
 Connector only, without the skill:
 
 ```
-claude mcp add --transport http extractorlead https://api.extractorlead.com/mcp --header "X-API-Key: sk_live_..."
+claude mcp add --transport http extractorlead https://api.extractorlead.com/mcp
 ```
+
+Prefer an API key (CI, scripts)? Create one at
+<https://app.extractorlead.com> → **Profile → API keys** and add
+`--header "X-API-Key: sk_live_..."`.
 
 ### Local server (stdio)
 
 Useful for passing a CSV/XLSX straight from disk (`file_path`), which the remote
-connector can't read.
+connector can't read. It uses an API key from **Profile → API keys**.
 
 ```json
 {
@@ -71,7 +72,7 @@ connector can't read.
 Claude Desktop: `%APPDATA%\Claude\claude_desktop_config.json` (Windows) or
 `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS).
 
-## 3. Try it
+## 2. Try it
 
 > Find me 25 emails of marketing directors at SaaS companies in Madrid.
 
@@ -113,9 +114,18 @@ claude plugin validate .
 `EXTRACTORLEAD_API_URL` overrides the API base URL (default
 `https://api.extractorlead.com`; in the cluster it points to the internal
 Service). In HTTP mode the server **never** uses a key from its environment or
-reads its own disk: every request must bring the user's key (`X-API-Key`,
-`Authorization: Bearer`, or `?api_key=`), and the access log is disabled so
-keys in the URL aren't written to logs.
+reads its own disk: every request must bring the user's credential, and
+`/mcp` answers `401` with `WWW-Authenticate: Bearer resource_metadata=...` when
+it doesn't, which is what makes Claude offer **Connect**.
+
+- **OAuth 2.1** (default): `api.extractorlead.com` is the authorization server
+  (`/.well-known/oauth-authorization-server`, Dynamic Client Registration at
+  `/oauth/register`, PKCE S256, rotating refresh tokens). Claude sends
+  `Authorization: Bearer elo_at_...`; the gate checks it against the API and
+  answers `401 invalid_token` when it expired so Claude refreshes it.
+- **API key**: `X-API-Key`, `Authorization: Bearer sk_live_...`, or
+  `?api_key=` (legacy). The access log is disabled so keys in the URL aren't
+  written to logs.
 
 Deployment: the remote server runs on ExtractorLead's infrastructure (image from
 `Dockerfile`, Terraform stack `extractor-lead/mcp`). This public repository is a

@@ -19,9 +19,13 @@ def main() -> None:
         import uvicorn
         # Sin estado: cualquier réplica atiende cualquier petición, así que se
         # puede escalar detrás del balanceador sin sesiones pegajosas.
+        from .auth_gate import AuthGate
         from .guide import BrowserGuide
         app = server.mcp.streamable_http_app(stateless_http=True, json_response=True,
                                              host=args.host)
+        # Sin credencial, /mcp responde 401 con los metadatos OAuth: Claude
+        # muestra "Conectar" y el usuario inicia sesión en ExtractorLead.
+        app = AuthGate(app)
         # Quien abre la URL del conector en un navegador ve cómo añadirlo a Claude.
         app = BrowserGuide(app)
         # access_log=False: la URL del conector de claude.ai lleva la API key en

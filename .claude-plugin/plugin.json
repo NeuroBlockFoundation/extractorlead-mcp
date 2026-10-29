@@ -1,25 +1,15 @@
 {
   "name": "extractorlead",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "ExtractorLead for Claude: find leads (emails & phones) on LinkedIn, Instagram, TikTok and websites, and enrich your contact lists.",
   "author": { "name": "NeuroBlock Foundation", "url": "https://extractorlead.com" },
   "homepage": "https://extractorlead.com",
   "license": "MIT",
   "keywords": ["leads", "prospecting", "sales", "enrichment", "linkedin", "mcp"],
-  "userConfig": {
-    "api_key": {
-      "type": "string",
-      "title": "ExtractorLead API key",
-      "description": "Create it at https://app.extractorlead.com (Profile → API keys). Starts with sk_live_.",
-      "sensitive": true,
-      "required": true
-    }
-  },
   "mcpServers": {
     "extractorlead": {
       "type": "http",
-      "url": "https://api.extractorlead.com/mcp",
-      "headers": { "X-API-Key": "${user_config.api_key}" }
+      "url": "https://api.extractorlead.com/mcp"
     }
   }
 }
