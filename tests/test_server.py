@@ -244,3 +244,21 @@ def test_mcp_clients_are_not_affected_by_the_guide(http_server):
     with httpx2.stream("GET", f"{http_server}/mcp", headers={"Accept": "text/event-stream"},
                        timeout=5) as r:
         assert "text/html" not in r.headers.get("content-type", "")
+
+
+async def test_every_tool_has_annotations_title_and_neutral_description():
+    """Requisitos de la revisión del directorio de conectores de Claude:
+    annotations.title en cada herramienta y descripciones sin instrucciones al
+    modelo ni referencias a otras herramientas."""
+    async with Client(server.mcp) as c:
+        tools = (await c.list_tools()).tools
+    names = {t.name for t in tools}
+    assert len(tools) == 13
+    for t in tools:
+        assert t.annotations and t.annotations.title == t.title, t.name
+        desc = t.description or ""
+        for other in names - {t.name}:
+            assert other not in desc, f"{t.name} menciona {other}"
+        for phrase in ("SIEMPRE", "Pide confirmación", "Úsalo", "avisa al usuario",
+                       "ofrece al usuario"):
+            assert phrase not in desc, f"{t.name}: {phrase}"

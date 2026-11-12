@@ -43,6 +43,13 @@ Reglas de uso:
 - Los teléfonos de las listas masivas llegan de forma diferida (hasta ~1 hora,
   phase="awaiting_phones"). Explícaselo al usuario y ofrece volver a consultar
   más tarde con el mismo task_id en vez de esperar en bucle.
+- Flujos: preview_bulk_enrichment siempre antes de start_bulk_enrichment
+  (enseña rows_accepted, max_credits y available_credits);
+  preview_list_enrichment antes de start_list_enrichment, con credit_cap = el
+  tope que apruebe el usuario (por defecto, el tope_sugerido de la cotización).
+- Con partial=true en get_bulk_status ya se pueden leer leads con
+  get_bulk_results. Para listas grandes ofrece get_bulk_download_link en vez
+  de paginar todo en la conversación.
 - No reveles ni especules sobre de qué proveedores o bases de datos salen los
   datos: son de ExtractorLead.
 - Recargas y API keys: {APP_URL}
@@ -171,16 +178,24 @@ _SPENDS = ToolAnnotations(read_only_hint=False, destructive_hint=False,
 _READS = ToolAnnotations(read_only_hint=True, open_world_hint=True)
 
 
+def _spends(title: str) -> ToolAnnotations:
+    """Anotaciones de herramientas que gastan créditos, con annotations.title
+    (lo exige la revisión del directorio de conectores de Claude)."""
+    return _SPENDS.model_copy(update={"title": title})
+
+
+def _reads(title: str) -> ToolAnnotations:
+    """Anotaciones de herramientas de solo lectura, con annotations.title."""
+    return _READS.model_copy(update={"title": title})
+
+
 # ---------------------------------------------------------------------------
 # Cuenta
 # ---------------------------------------------------------------------------
 
-@mcp.tool(title="Saldo y plan", annotations=_READS)
+@mcp.tool(title="Saldo y plan", annotations=_reads("Saldo y plan"))
 async def get_account(ctx: Context) -> dict[str, Any]:
-    """Saldo de créditos y estado de la suscripción de ExtractorLead.
-
-    Úsalo antes de lanzar cualquier trabajo para saber si hay saldo suficiente.
-    """
+    """Saldo de créditos y estado de la suscripción de ExtractorLead."""
     return await _call(ctx, lambda api: api.get("/account"))
 
 
@@ -188,7 +203,7 @@ async def get_account(ctx: Context) -> dict[str, Any]:
 # Búsquedas de leads por nicho
 # ---------------------------------------------------------------------------
 
-@mcp.tool(title="Buscar leads por nicho", annotations=_SPENDS)
+@mcp.tool(title="Buscar leads por nicho", annotations=_spends("Buscar leads por nicho"))
 async def search_leads(
     ctx: Context,
     channel: Literal["linkedin", "instagram", "tiktok"],
@@ -209,8 +224,7 @@ async def search_leads(
     - lead_count: 1..500 (por defecto 25).
     - country: código ISO de 2 letras, solo para linkedin+phones (p.ej. "es").
 
-    Devuelve un task_id; recoge los leads con get_task_result.
-    Pide confirmación al usuario antes de llamarla.
+    Devuelve un task_id para consultar el resultado.
     """
     if not 1 <= lead_count <= 500:
         raise ToolError("lead_count debe estar entre 1 y 500.")
@@ -220,23 +234,23 @@ async def search_leads(
     return await _call(ctx, lambda api: api.post(f"/{channel}/{contact}", body))
 
 
-@mcp.tool(title="Enriquecer perfil de LinkedIn", annotations=_SPENDS)
+@mcp.tool(title="Enriquecer perfil de LinkedIn", annotations=_spends("Enriquecer perfil de LinkedIn"))
 async def lookup_linkedin_profile(ctx: Context, linkedin_url: str) -> dict[str, Any]:
     """Obtiene email, teléfono y datos profesionales de UN perfil de LinkedIn.
 
     linkedin_url: https://www.linkedin.com/in/<usuario>/
-    Devuelve un task_id; el resultado se recoge con get_task_result.
+    Devuelve un task_id para consultar el resultado.
     """
     if "linkedin.com/in/" not in linkedin_url:
         raise ToolError("Debe ser una URL de perfil: https://www.linkedin.com/in/<usuario>/")
     return await _call(ctx, lambda api: api.post("/linkedin/profile", {"url": linkedin_url}))
 
 
-@mcp.tool(title="Analizar web", annotations=_SPENDS)
+@mcp.tool(title="Analizar web", annotations=_spends("Analizar web"))
 async def analyze_website(ctx: Context, url: str, language: str = "es") -> dict[str, Any]:
     """Analiza una web: contactos (emails, teléfonos, redes), negocio y servicios.
 
-    url debe incluir http:// o https://. Devuelve un task_id para get_task_result.
+    url debe incluir http:// o https://. Devuelve un task_id.
     """
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
@@ -244,7 +258,7 @@ async def analyze_website(ctx: Context, url: str, language: str = "es") -> dict[
                                                  {"url": url, "language": language}))
 
 
-@mcp.tool(title="Resultado de una búsqueda", annotations=_READS)
+@mcp.tool(title="Resultado de una búsqueda", annotations=_reads("Resultado de una búsqueda"))
 async def get_task_result(
     ctx: Context,
     task_id: str,
@@ -252,7 +266,7 @@ async def get_task_result(
     offset: int = 0,
     limit: int = 50,
 ) -> dict[str, Any]:
-    """Estado y resultado de search_leads, lookup_linkedin_profile o analyze_website.
+    """Estado y resultado de una búsqueda de leads, perfil o análisis web.
 
     - wait_seconds: espera hasta 50s a que termine antes de responder.
     - offset/limit: paginación de la lista de leads cuando es larga.
@@ -301,18 +315,16 @@ def _bulk_config(contact_info, match_mode, related_per_company, require_mobile):
 
 _PREVIEW_BULK_DOC = """Valida una lista de personas y calcula el coste máximo. NO cobra nada.
 
-    Úsalo SIEMPRE antes de start_bulk_enrichment y enseña al usuario
-    rows_accepted, max_credits y available_credits.
+    Devuelve rows_accepted, max_credits y available_credits.
 """ + _LEADS_DOC
 
 _START_BULK_DOC = """Lanza el enriquecimiento de una lista de personas. Consume créditos.
 
-    Solo tras preview_bulk_enrichment y con la confirmación del usuario.
-    Devuelve un task_id; sigue el trabajo con get_bulk_status.
+    Devuelve un task_id para seguir el trabajo.
 """ + _LEADS_DOC
 
 
-@mcp.tool(title="Cotizar enriquecimiento masivo", annotations=_READS,
+@mcp.tool(title="Cotizar enriquecimiento masivo", annotations=_reads("Cotizar enriquecimiento masivo"),
           description=_PREVIEW_BULK_DOC)
 async def preview_bulk_enrichment(
     ctx: Context,
@@ -328,7 +340,7 @@ async def preview_bulk_enrichment(
                                                    leads, file_path, cfg))
 
 
-@mcp.tool(title="Lanzar enriquecimiento masivo", annotations=_SPENDS,
+@mcp.tool(title="Lanzar enriquecimiento masivo", annotations=_spends("Lanzar enriquecimiento masivo"),
           description=_START_BULK_DOC)
 async def start_bulk_enrichment(
     ctx: Context,
@@ -344,14 +356,13 @@ async def start_bulk_enrichment(
                                                    leads, file_path, cfg))
 
 
-@mcp.tool(title="Estado del enriquecimiento masivo", annotations=_READS)
+@mcp.tool(title="Estado del enriquecimiento masivo", annotations=_reads("Estado del enriquecimiento masivo"))
 async def get_bulk_status(ctx: Context, task_id: str, wait_seconds: int = 30) -> dict[str, Any]:
     """Contadores de un trabajo masivo (nunca la lista).
 
-    phase: processing | awaiting_phones | completed. Con partial=true ya se
-    pueden leer los leads decididos con get_bulk_results. Los teléfonos pueden
-    tardar hasta ~1 hora: si phase es awaiting_phones, avisa al usuario y
-    vuelve a consultar más tarde en lugar de esperar en bucle.
+    phase: processing | awaiting_phones | completed. partial=true indica que
+    ya hay leads decididos disponibles. En awaiting_phones los teléfonos
+    pueden tardar hasta ~1 hora.
     """
     async def run(api: ExtractorLeadClient):
         return await _poll(lambda: api.get(f"/leads/bulk/{task_id}"), wait_seconds,
@@ -359,7 +370,7 @@ async def get_bulk_status(ctx: Context, task_id: str, wait_seconds: int = 30) ->
     return await _call(ctx, run)
 
 
-@mcp.tool(title="Leads del enriquecimiento masivo", annotations=_READS)
+@mcp.tool(title="Leads del enriquecimiento masivo", annotations=_reads("Leads del enriquecimiento masivo"))
 async def get_bulk_results(
     ctx: Context,
     task_id: str,
@@ -368,18 +379,14 @@ async def get_bulk_results(
     only: Literal["all", "with_phone", "with_email", "with_both"] = "all",
     match: Literal["all", "exact", "related"] = "all",
 ) -> dict[str, Any]:
-    """Leads enriquecidos de un trabajo masivo, paginados (per_page máx. 200).
-
-    Para listas grandes ofrece al usuario get_bulk_download_link en vez de
-    paginar todo en la conversación.
-    """
+    """Leads enriquecidos de un trabajo masivo, paginados (per_page máx. 200)."""
     per_page = max(1, min(per_page, 200))
     return await _call(ctx, lambda api: api.get(
         f"/leads/bulk/{task_id}/results", page=page, per_page=per_page,
         only=only, match=match))
 
 
-@mcp.tool(title="Enlace de descarga (masivo)", annotations=_READS)
+@mcp.tool(title="Enlace de descarga (masivo)", annotations=_reads("Enlace de descarga (masivo)"))
 async def get_bulk_download_link(ctx: Context, task_id: str) -> dict[str, Any]:
     """Enlace temporal (15 min) para descargar todos los leads del trabajo en JSON."""
     return await _call(ctx, lambda api: api.get(f"/leads/bulk/{task_id}/download"))
@@ -394,7 +401,7 @@ def _enrich_config(wants_phone, phone_for_all, credit_cap=None):
             "credit_cap": credit_cap}
 
 
-@mcp.tool(title="Cotizar relleno de lista", annotations=_READS)
+@mcp.tool(title="Cotizar relleno de lista", annotations=_reads("Cotizar relleno de lista"))
 async def preview_list_enrichment(
     ctx: Context,
     leads: list[dict[str, Any]] | None = None,
@@ -415,7 +422,7 @@ async def preview_list_enrichment(
                                                    leads, file_path, cfg))
 
 
-@mcp.tool(title="Lanzar relleno de lista", annotations=_SPENDS)
+@mcp.tool(title="Lanzar relleno de lista", annotations=_spends("Lanzar relleno de lista"))
 async def start_list_enrichment(
     ctx: Context,
     credit_cap: int,
@@ -426,9 +433,8 @@ async def start_list_enrichment(
 ) -> dict[str, Any]:
     """Lanza el relleno de huecos de una lista. Consume créditos hasta credit_cap.
 
-    credit_cap: tope de gasto que el usuario ha aprobado (usa el tope_sugerido
-    de preview_list_enrichment si no dice otro). Sigue el trabajo con
-    get_list_enrichment.
+    credit_cap: tope de gasto en créditos para este trabajo. Devuelve un
+    task_id para seguir el trabajo.
     """
     if credit_cap <= 0:
         raise ToolError("credit_cap debe ser mayor que 0.")
@@ -437,7 +443,7 @@ async def start_list_enrichment(
                                                    leads, file_path, cfg))
 
 
-@mcp.tool(title="Estado del relleno de lista", annotations=_READS)
+@mcp.tool(title="Estado del relleno de lista", annotations=_reads("Estado del relleno de lista"))
 async def get_list_enrichment(
     ctx: Context,
     task_id: str,
